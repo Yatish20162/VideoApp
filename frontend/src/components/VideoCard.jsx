@@ -2,98 +2,141 @@ import { Link } from 'react-router-dom'
 import StatusBadge from './StatusBadge'
 import ProgressBar from './ProgressBar'
 
-function formatBytes(bytes) {
+function fmt(bytes) {
   if (!bytes) return '—'
-  const mb = bytes / (1024 * 1024)
-  return mb >= 1000 ? `${(mb / 1024).toFixed(1)} GB` : `${mb.toFixed(1)} MB`
+  const mb = bytes / 1048576
+  return mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${mb.toFixed(1)} MB`
+}
+function dur(s) {
+  if (!s) return null
+  const m = Math.floor(s / 60), sec = Math.floor(s % 60)
+  return `${m}:${String(sec).padStart(2, '0')}`
+}
+function relDate(d) {
+  const diff = Date.now() - new Date(d)
+  const h = diff / 3.6e6
+  if (h < 1)    return 'just now'
+  if (h < 24)   return `${Math.floor(h)}h ago`
+  if (h < 168)  return `${Math.floor(h / 24)}d ago`
+  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
-function formatDuration(seconds) {
-  if (!seconds) return '—'
-  const m = Math.floor(seconds / 60)
-  const s = Math.floor(seconds % 60)
-  return `${m}:${s.toString().padStart(2, '0')}`
-}
-
-function formatDate(dateStr) {
-  return new Date(dateStr).toLocaleDateString('en-US', {
-    month: 'short', day: 'numeric', year: 'numeric'
-  })
+const STATUS_ACCENT = {
+  safe:       'var(--sky)',
+  flagged:    'var(--red)',
+  processing: 'var(--amber)',
+  error:      'var(--red)',
 }
 
 export default function VideoCard({ video, liveProgress, onDelete, canDelete }) {
   const isProcessing = video.status === 'processing'
   const pct = liveProgress?.pct ?? (isProcessing ? 0 : 100)
+  const accent = STATUS_ACCENT[video.status] || 'var(--sky)'
 
   return (
-    <div className="card group relative overflow-hidden animate-slide-up hover:border-white/10 transition-all duration-300">
-      {/* Top stripe color by status */}
-      <div
-        className={`absolute top-0 left-0 right-0 h-0.5 ${
-          video.status === 'safe' ? 'bg-sky-pulse' :
-          video.status === 'flagged' ? 'bg-ember' : 'bg-gold'
-        }`}
-      />
+    <div className="card card-hover anim-fade-up" style={{ display: 'flex', flexDirection: 'column' }}>
+      {/* Top accent line */}
+      <div style={{ height: 2, background: accent, opacity: 0.7 }} />
 
-      <div className="p-5">
+      <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem', flex: 1 }}>
+
         {/* Header */}
-        <div className="flex items-start justify-between gap-3 mb-4">
-          <div className="flex-1 min-w-0">
-            <h3 className="font-display font-semibold text-white text-base leading-tight truncate">
-              {video.title || video.filename}
-            </h3>
-            <p className="text-xs font-mono text-white/30 mt-1">{formatDate(video.uploadedAt)}</p>
-          </div>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
+          <h3 style={{
+            fontFamily: 'var(--font-display)', fontWeight: 700,
+            fontSize: '0.9375rem', color: 'rgba(255,255,255,0.92)',
+            lineHeight: 1.35, flex: 1,
+            overflow: 'hidden', display: '-webkit-box',
+            WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+          }}>
+            {video.title || video.originalName}
+          </h3>
           <StatusBadge status={video.status} />
         </div>
 
-        {/* Stats row */}
-        <div className="flex items-center gap-4 mb-4 text-xs font-mono text-white/30">
-          <span>{formatBytes(video.size)}</span>
-          {video.duration && <span>· {formatDuration(video.duration)}</span>}
-          {video.sensitivity?.score != null && (
-            <span className={video.status === 'flagged' ? 'text-ember' : 'text-sky-pulse'}>
-              · score {(video.sensitivity.score * 100).toFixed(0)}%
+        {/* Meta row */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          {[
+            fmt(video.size),
+            dur(video.duration),
+            relDate(video.uploadedAt || video.createdAt),
+          ].filter(Boolean).map((val, i) => (
+            <span key={i} style={{
+              fontFamily: 'var(--font-mono)', fontSize: '0.68rem',
+              color: 'rgba(255,255,255,0.28)', letterSpacing: '0.02em',
+            }}>
+              {i > 0 && <span style={{ marginRight: 8, opacity: 0.4 }}>·</span>}
+              {val}
             </span>
-          )}
+          ))}
         </div>
 
-        {/* Progress bar during processing */}
+        {/* Progress during processing */}
         {isProcessing && (
-          <ProgressBar pct={pct} label={liveProgress?.stage || 'Analyzing…'} className="mb-4" />
+          <ProgressBar pct={pct} label={liveProgress?.stage || 'Queued'} />
         )}
 
-        {/* Sensitivity reason if flagged */}
+        {/* Flagged reason */}
         {video.status === 'flagged' && video.sensitivity?.reason && (
-          <div className="mb-4 px-3 py-2 bg-ember-dim rounded-lg border border-ember/20">
-            <p className="text-xs text-ember/80 font-mono">{video.sensitivity.reason}</p>
+          <div style={{
+            background: 'var(--red-dim)', border: '1px solid rgba(255,77,77,0.18)',
+            borderRadius: 8, padding: '8px 10px',
+          }}>
+            <p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.68rem', color: 'rgba(255,100,100,0.8)', lineHeight: 1.5 }}>
+              {video.sensitivity.reason}
+            </p>
           </div>
         )}
 
+        {/* Sensitivity score pill */}
+        {video.sensitivity?.score != null && video.status !== 'processing' && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              Score
+            </span>
+            <div style={{
+              height: 3, flex: 1, background: 'var(--rim)', borderRadius: 99, overflow: 'hidden',
+            }}>
+              <div style={{
+                height: '100%', borderRadius: 99,
+                width: `${(video.sensitivity.score * 100).toFixed(0)}%`,
+                background: video.status === 'flagged' ? 'var(--red)' : 'var(--sky)',
+                opacity: 0.7,
+              }} />
+            </div>
+            <span style={{
+              fontFamily: 'var(--font-mono)', fontSize: '0.65rem',
+              color: video.status === 'flagged' ? 'var(--red)' : 'var(--sky)',
+            }}>
+              {(video.sensitivity.score * 100).toFixed(0)}%
+            </span>
+          </div>
+        )}
+
+        {/* Spacer */}
+        <div style={{ flex: 1 }} />
+
         {/* Actions */}
-        <div className="flex items-center gap-2 pt-3 border-t border-white/5">
-          {video.status !== 'processing' && (
-            <Link
-              to={`/player/${video._id}`}
-              className="flex-1 text-center text-xs font-mono text-acid hover:text-acid-dark transition-colors py-2 rounded-lg hover:bg-acid/5"
-            >
-              ▶ Play
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          borderTop: '1px solid var(--rim)', paddingTop: '0.875rem',
+          marginTop: 'auto',
+        }}>
+          {!isProcessing && (
+            <Link to={`/player/${video._id}`} className="btn btn-sm" style={{
+              flex: 1, background: 'var(--lime-dim)',
+              color: 'var(--lime)', border: '1px solid rgba(200,255,0,0.15)',
+            }}>
+              <svg width="11" height="11" viewBox="0 0 11 11" fill="currentColor">
+                <path d="M2 1.5l7 4-7 4V1.5z"/>
+              </svg>
+              Play
             </Link>
           )}
-          <Link
-            to={`/library/${video._id}`}
-            className="flex-1 text-center text-xs font-mono text-white/40 hover:text-white transition-colors py-2 rounded-lg hover:bg-white/5"
-          >
-            Details
-          </Link>
           {canDelete && (
-            <button
-              onClick={() => onDelete(video._id)}
-              className="w-8 h-8 rounded-lg border border-white/5 flex items-center justify-center text-white/20 hover:text-ember hover:border-ember/30 transition-all duration-200"
-              title="Delete"
-            >
-              <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-                <path d="M2 3h9M5 3V2h3v1M4 3v7a1 1 0 001 1h3a1 1 0 001-1V3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+            <button onClick={() => onDelete(video._id)} className="btn btn-sm btn-danger" style={{ flexShrink: 0, padding: '0.45rem 0.7rem' }} title="Delete">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M1.5 3h9M4.5 3V2h3v1M3 3v6.5a1 1 0 001 1h4a1 1 0 001-1V3" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round"/>
               </svg>
             </button>
           )}

@@ -83,23 +83,18 @@ const getVideos = async (req, res, next) => {
   try {
     const { status, page = 1, limit = 20, sort = "newest" } = req.query;
 
-    // Build query filter
     const filter = {};
 
     if (req.user.role === "admin") {
-      // Admin sees entire org
       filter.orgId = req.user.orgId;
     } else {
-      // Everyone else sees only their own
       filter.owner = req.user._id;
     }
 
-    // Optional status filter
     if (status && ["processing", "safe", "flagged", "error"].includes(status)) {
       filter.status = status;
     }
 
-    // Sorting
     const sortMap = {
       newest: { createdAt: -1 },
       oldest: { createdAt: 1 },
@@ -107,10 +102,9 @@ const getVideos = async (req, res, next) => {
     };
     const sortOrder = sortMap[sort] || sortMap.newest;
 
-    // Pagination
-    const pageNum = Math.max(parseInt(page, 10), 1);
+    const pageNum  = Math.max(parseInt(page, 10), 1);
     const limitNum = Math.min(parseInt(limit, 10), 100);
-    const skip = (pageNum - 1) * limitNum;
+    const skip     = (pageNum - 1) * limitNum;
 
     const [videos, total] = await Promise.all([
       Video.find(filter)
@@ -149,10 +143,9 @@ const getVideoById = async (req, res, next) => {
       return res.status(404).json({ success: false, message: "Video not found." });
     }
 
-    // Ownership check
-    const isOwner    = video.owner._id.toString() === req.user._id.toString();
-    const isAdmin    = req.user.role === "admin";
-    const isSameOrg  = video.orgId?.toString() === req.user.orgId?.toString();
+    const isOwner   = video.owner._id.toString() === req.user._id.toString();
+    const isAdmin   = req.user.role === "admin";
+    const isSameOrg = video.orgId?.toString() === req.user.orgId?.toString();
 
     if (!isOwner && !(isAdmin && isSameOrg)) {
       return res.status(403).json({ success: false, message: "Access denied." });
@@ -177,15 +170,14 @@ const deleteVideo = async (req, res, next) => {
       return res.status(404).json({ success: false, message: "Video not found." });
     }
 
-    const isOwner    = video.owner.toString() === req.user._id.toString();
-    const isAdmin    = req.user.role === "admin";
-    const isSameOrg  = video.orgId?.toString() === req.user.orgId?.toString();
+    const isOwner   = video.owner.toString() === req.user._id.toString();
+    const isAdmin   = req.user.role === "admin";
+    const isSameOrg = video.orgId?.toString() === req.user.orgId?.toString();
 
     if (!isOwner && !(isAdmin && isSameOrg)) {
       return res.status(403).json({ success: false, message: "Access denied." });
     }
 
-    // Delete file from disk
     if (fs.existsSync(video.filepath)) {
       fs.unlinkSync(video.filepath);
     }
@@ -200,8 +192,14 @@ const deleteVideo = async (req, res, next) => {
 
 /**
  * GET /api/videos/:id/stream
- * Auth: any role
- * Streams video with HTTP range request support
+ * Auth: any role (token accepted via header OR ?token= query param)
+ *
+ * The browser's <video src="..."> tag cannot set custom headers, so the
+ * Player page appends ?token=<jwt> to the stream URL. The protect middleware
+ * already handles reading the token from req.query.token as a fallback.
+ *
+ * Only videos with status "safe" or "flagged" can be streamed.
+ * Videos still "processing" return 409 Conflict.
  */
 const streamVideoHandler = async (req, res, next) => {
   try {
@@ -211,7 +209,7 @@ const streamVideoHandler = async (req, res, next) => {
       return res.status(404).json({ success: false, message: "Video not found." });
     }
 
-    // Access check
+    // Access check — same ownership rules as getVideoById
     const isOwner   = video.owner.toString() === req.user._id.toString();
     const isAdmin   = req.user.role === "admin";
     const isSameOrg = video.orgId?.toString() === req.user.orgId?.toString();
@@ -220,7 +218,7 @@ const streamVideoHandler = async (req, res, next) => {
       return res.status(403).json({ success: false, message: "Access denied." });
     }
 
-    // Only allow streaming of processed videos
+    // Block streaming if still processing
     if (video.status === "processing") {
       return res.status(409).json({
         success: false,
@@ -228,7 +226,28 @@ const streamVideoHandler = async (req, res, next) => {
       });
     }
 
-    streamVideo(req, res, video.filepath, video.mimetype || "video/mp4");
+    // Block streaming if processing errored (no usable file)
+    if (video.status === "error") {
+      return res.status(422).json({
+        success: false,
+        message: "Video processing failed. File cannot be streamed.",
+      });
+    }
+
+    // Verify the physical file still exists before streaming
+    if (!fs.existsSync(video.filepath)) {
+      return res.status(404).json({
+        success: false,
+        message: "Video file is missing from storage.",
+      });
+    }
+
+    // Fallback mimetype — always prefer what was stored at upload time
+    const mimetype = video.mimetype || "video/mp4";
+
+    console.log(`🎬 Streaming video ${video._id} to user ${req.user._id}`);
+    streamVideo(req, res, video.filepath, mimetype);
+
   } catch (err) {
     next(err);
   }
@@ -241,7 +260,10 @@ const streamVideoHandler = async (req, res, next) => {
  */
 const getVideoStatus = async (req, res, next) => {
   try {
-    const video = await Video.findById(req.params.id, "status processingProgress sensitivity");
+    const video = await Video.findById(
+      req.params.id,
+      "status processingProgress sensitivity"
+    );
 
     if (!video) {
       return res.status(404).json({ success: false, message: "Video not found." });

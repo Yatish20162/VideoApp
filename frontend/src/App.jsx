@@ -11,9 +11,9 @@ import Player from './pages/Player'
 
 function AppLayout({ children }) {
   return (
-    <div className="min-h-screen">
+    <div style={{ minHeight: '100svh', display: 'flex', flexDirection: 'column' }}>
       <Navbar />
-      <main className="pt-16">
+      <main style={{ flex: 1, paddingTop: '64px' }}>
         {children}
       </main>
     </div>
@@ -22,36 +22,24 @@ function AppLayout({ children }) {
 
 function AppRoutes() {
   const { isAuthenticated } = useAuth()
-
   return (
     <Routes>
-      {/* Public */}
-      <Route path="/login" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />} />
+      <Route path="/login"    element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />} />
       <Route path="/register" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Register />} />
 
-      {/* Protected */}
       <Route path="/dashboard" element={
-        <ProtectedRoute>
-          <AppLayout><Dashboard /></AppLayout>
-        </ProtectedRoute>
+        <ProtectedRoute><AppLayout><Dashboard /></AppLayout></ProtectedRoute>
       } />
       <Route path="/upload" element={
-        <ProtectedRoute>
-          <AppLayout><Upload /></AppLayout>
-        </ProtectedRoute>
+        <ProtectedRoute><AppLayout><Upload /></AppLayout></ProtectedRoute>
       } />
       <Route path="/library" element={
-        <ProtectedRoute>
-          <AppLayout><Library /></AppLayout>
-        </ProtectedRoute>
+        <ProtectedRoute><AppLayout><Library /></AppLayout></ProtectedRoute>
       } />
       <Route path="/player/:id" element={
-        <ProtectedRoute>
-          <AppLayout><Player /></AppLayout>
-        </ProtectedRoute>
+        <ProtectedRoute><AppLayout><Player /></AppLayout></ProtectedRoute>
       } />
 
-      {/* Fallback */}
       <Route path="*" element={<Navigate to={isAuthenticated ? '/dashboard' : '/login'} replace />} />
     </Routes>
   )

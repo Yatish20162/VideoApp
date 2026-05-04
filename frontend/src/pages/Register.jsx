@@ -2,122 +2,155 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
+const ROLES = [
+  { value: 'viewer', label: 'Viewer', desc: 'Read-only access to assigned videos', icon: '👁' },
+  { value: 'editor', label: 'Editor', desc: 'Upload, manage and analyze videos',   icon: '✏️' },
+  { value: 'admin',  label: 'Admin',  desc: 'Full system access and user management', icon: '⚡' },
+]
+
 export default function Register() {
   const { register } = useAuth()
   const navigate = useNavigate()
 
-  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'editor' })
-  const [error, setError] = useState('')
+  const [form, setForm]     = useState({ name: '', email: '', password: '', role: 'editor' })
+  const [error, setError]   = useState('')
   const [loading, setLoading] = useState(false)
 
-  const handleSubmit = async (e) => {
+  const set = key => e => setForm(f => ({ ...f, [key]: e.target.value }))
+
+  const handleSubmit = async e => {
     e.preventDefault()
-    setError('')
-    setLoading(true)
+    setError(''); setLoading(true)
     try {
       await register(form.name, form.email, form.password, form.role)
       navigate('/dashboard')
     } catch (err) {
-      setError(err.response?.data?.message || 'Registration failed.')
+      setError(err.response?.data?.message || 'Registration failed. Please try again.')
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 relative overflow-hidden">
-      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full bg-acid/5 blur-[120px] pointer-events-none" />
+    <div style={{
+      minHeight: '100svh', background: 'var(--ink)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: '2rem', position: 'relative', overflow: 'hidden',
+    }}>
+      {/* Background glow */}
+      <div style={{
+        position: 'fixed', top: '40%', left: '50%', transform: 'translate(-50%,-50%)',
+        width: 600, height: 600, borderRadius: '50%',
+        background: 'radial-gradient(circle, rgba(200,255,0,0.045) 0%, transparent 70%)',
+        pointerEvents: 'none',
+      }} />
 
-      <div className="w-full max-w-md animate-slide-up">
-        <div className="text-center mb-10">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-acid mb-5 glow-acid">
-            <span className="font-display font-bold text-ink-950 text-2xl">VS</span>
+      <div className="anim-fade-up" style={{ width: '100%', maxWidth: 460 }}>
+
+        {/* Logo */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: '2.5rem', justifyContent: 'center' }}>
+          <div style={{
+            width: 34, height: 34, borderRadius: 9, background: 'var(--lime)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 0 18px var(--lime-glow)',
+          }}>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <rect x="2" y="2" width="5" height="5" rx="1" fill="var(--ink)"/>
+              <rect x="9" y="2" width="5" height="5" rx="1" fill="var(--ink)"/>
+              <rect x="2" y="9" width="5" height="5" rx="1" fill="var(--ink)"/>
+              <rect x="9" y="9" width="5" height="2.5" rx="1" fill="var(--ink)" opacity="0.5"/>
+            </svg>
           </div>
-          <h1 className="font-display font-extrabold text-3xl text-white mb-2">Create account</h1>
-          <p className="text-white/40 font-body text-sm">Join VaultStream and start uploading</p>
+          <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1rem', color: '#fff' }}>VaultStream</span>
         </div>
 
-        <div className="card p-8">
+        <div style={{ marginBottom: '2rem', textAlign: 'center' }}>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.75rem', color: '#fff', letterSpacing: '-0.02em', marginBottom: 6 }}>
+            Create your account
+          </h1>
+          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.9rem' }}>Join VaultStream and start securing your content</p>
+        </div>
+
+        <div className="card" style={{ padding: '2rem' }}>
           {error && (
-            <div className="mb-6 px-4 py-3 rounded-xl bg-ember-dim border border-ember/20 text-ember text-sm">
+            <div className="alert alert-error" style={{ marginBottom: '1.25rem' }}>
+              <svg width="15" height="15" viewBox="0 0 15 15" fill="none" style={{ flexShrink: 0, marginTop: 1 }}>
+                <circle cx="7.5" cy="7.5" r="6.5" stroke="currentColor" strokeWidth="1.3"/>
+                <path d="M7.5 4.5v3.5M7.5 10h.01" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+              </svg>
               {error}
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.125rem' }}>
             <div>
-              <label className="label">Full name</label>
-              <input
-                type="text"
-                className="input-field"
-                placeholder="Jane Smith"
-                value={form.name}
-                onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                required
-              />
+              <label className="field-label">Full name</label>
+              <input type="text" className="field-input" placeholder="Jane Smith"
+                value={form.name} onChange={set('name')} required />
+            </div>
+            <div>
+              <label className="field-label">Email address</label>
+              <input type="email" className="field-input" placeholder="you@company.com"
+                value={form.email} onChange={set('email')} required />
+            </div>
+            <div>
+              <label className="field-label">Password</label>
+              <input type="password" className="field-input" placeholder="Min. 6 characters"
+                value={form.password} onChange={set('password')} required minLength={6} />
             </div>
 
+            {/* Role selector */}
             <div>
-              <label className="label">Email</label>
-              <input
-                type="email"
-                className="input-field"
-                placeholder="you@example.com"
-                value={form.email}
-                onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-                required
-              />
+              <label className="field-label">Select role</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {ROLES.map(r => (
+                  <button type="button" key={r.value} onClick={() => setForm(f => ({ ...f, role: r.value }))}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 12,
+                      padding: '10px 14px', borderRadius: 10, cursor: 'pointer',
+                      background: form.role === r.value ? 'var(--lime-dim)' : 'var(--ink-3)',
+                      border: `1px solid ${form.role === r.value ? 'rgba(200,255,0,0.25)' : 'var(--rim-2)'}`,
+                      transition: 'all 0.15s', textAlign: 'left',
+                    }}
+                  >
+                    <span style={{ fontSize: '1rem', lineHeight: 1 }}>{r.icon}</span>
+                    <div>
+                      <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: '0.8125rem', color: form.role === r.value ? 'var(--lime)' : 'rgba(255,255,255,0.8)' }}>
+                        {r.label}
+                      </div>
+                      <div style={{ fontFamily: 'var(--font-body)', fontSize: '0.75rem', color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>
+                        {r.desc}
+                      </div>
+                    </div>
+                    {form.role === r.value && (
+                      <div style={{ marginLeft: 'auto', width: 16, height: 16, borderRadius: '50%', background: 'var(--lime)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+                          <path d="M1.5 4l2 2L6.5 2" stroke="var(--ink)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            <div>
-              <label className="label">Password</label>
-              <input
-                type="password"
-                className="input-field"
-                placeholder="Min. 8 characters"
-                value={form.password}
-                onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
-                required
-                minLength={8}
-              />
-            </div>
-
-            <div>
-              <label className="label">Role</label>
-              <select
-                className="input-field appearance-none cursor-pointer"
-                value={form.role}
-                onChange={e => setForm(f => ({ ...f, role: e.target.value }))}
-              >
-                <option value="viewer">Viewer — read-only access</option>
-                <option value="editor">Editor — upload & manage</option>
-                <option value="admin">Admin — full access</option>
-              </select>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full btn-primary mt-2 font-display font-bold text-base"
-            >
+            <button type="submit" disabled={loading} className="btn btn-primary btn-full btn-lg" style={{ marginTop: 4 }}>
               {loading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                <>
+                  <svg className="spin" width="15" height="15" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.25"/>
+                    <path d="M12 2a10 10 0 0110 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
                   </svg>
                   Creating account…
-                </span>
+                </>
               ) : 'Create Account'}
             </button>
           </form>
         </div>
 
-        <p className="text-center text-sm text-white/30 mt-6">
+        <p style={{ textAlign: 'center', marginTop: '1.5rem', fontSize: '0.875rem', color: 'rgba(255,255,255,0.3)' }}>
           Already have an account?{' '}
-          <Link to="/login" className="text-acid hover:text-acid-dark transition-colors">
-            Sign in
-          </Link>
+          <Link to="/login" style={{ color: 'var(--lime)', fontWeight: 500 }}>Sign in →</Link>
         </p>
       </div>
     </div>

@@ -5,19 +5,19 @@ import api from '../api/axios'
 import VideoCard from '../components/VideoCard'
 
 const FILTERS = [
-  { value: '', label: 'All' },
-  { value: 'safe', label: '🟢 Safe' },
-  { value: 'flagged', label: '🔴 Flagged' },
-  { value: 'processing', label: '🟡 Processing' },
+  { value: '',           label: 'All'        },
+  { value: 'safe',       label: 'Safe'       },
+  { value: 'flagged',    label: 'Flagged'    },
+  { value: 'processing', label: 'Processing' },
 ]
 
 export default function Library() {
   const { user, token } = useAuth()
   const { on } = useSocket(token)
 
-  const [videos, setVideos] = useState([])
-  const [filter, setFilter] = useState('')
-  const [loading, setLoading] = useState(true)
+  const [videos,       setVideos]       = useState([])
+  const [filter,       setFilter]       = useState('')
+  const [loading,      setLoading]      = useState(true)
   const [liveProgress, setLiveProgress] = useState({})
 
   const canDelete = ['editor', 'admin'].includes(user?.role)
@@ -34,102 +34,119 @@ export default function Library() {
     }
   }
 
-  useEffect(() => {
-    fetchVideos(filter)
-  }, [filter])
+  useEffect(() => { fetchVideos(filter) }, [filter])
 
-  // Socket updates
   useEffect(() => {
-    const offProgress = on('processing:progress', ({ videoId, pct, stage }) => {
-      setLiveProgress(prev => ({ ...prev, [videoId]: { pct, stage } }))
+    const offP = on('processing:progress', ({ videoId, pct, stage }) =>
+      setLiveProgress(p => ({ ...p, [videoId]: { pct, stage } })))
+    const offC = on('processing:complete', ({ videoId, status, sensitivity }) => {
+      setLiveProgress(p => { const n = { ...p }; delete n[videoId]; return n })
+      setVideos(p => p.map(v => v._id === videoId ? { ...v, status, sensitivity } : v))
     })
-    const offComplete = on('processing:complete', ({ videoId, status, sensitivity }) => {
-      setLiveProgress(prev => { const n = { ...prev }; delete n[videoId]; return n })
-      setVideos(prev => prev.map(v => v._id === videoId ? { ...v, status, sensitivity } : v))
-    })
-    return () => { offProgress?.(); offComplete?.() }
+    return () => { offP?.(); offC?.() }
   }, [on])
 
-  const handleDelete = async (id) => {
+  const handleDelete = async id => {
     if (!window.confirm('Delete this video? This cannot be undone.')) return
     try {
       await api.delete(`/videos/${id}`)
-      setVideos(prev => prev.filter(v => v._id !== id))
+      setVideos(p => p.filter(v => v._id !== id))
     } catch (err) {
       alert(err.response?.data?.message || 'Delete failed.')
     }
   }
 
+  const FILTER_ACCENT = { safe: 'var(--sky)', flagged: 'var(--red)', processing: 'var(--amber)' }
+
   return (
-    <div className="max-w-7xl mx-auto px-6 py-10 animate-fade-in">
+    <div className="page-wrap">
+
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 mb-10">
+      <div className="anim-fade-up" style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '1.5rem', marginBottom: '2rem', flexWrap: 'wrap' }}>
         <div>
-          <p className="text-xs font-mono text-white/30 uppercase tracking-widest mb-2">Library</p>
-          <h1 className="font-display font-extrabold text-4xl text-white">Your Videos</h1>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(255,255,255,0.25)', marginBottom: 8 }}>
+            Library
+          </p>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 'clamp(1.75rem, 3vw, 2.25rem)', color: '#fff', letterSpacing: '-0.03em' }}>
+            Your Videos
+          </h1>
         </div>
 
-        {/* Filter tabs */}
-        <div className="flex items-center gap-1 bg-ink-800 border border-white/5 rounded-xl p-1">
-          {FILTERS.map(({ value, label }) => (
-            <button
-              key={value}
-              onClick={() => setFilter(value)}
-              className={`px-4 py-2 rounded-lg text-xs font-mono transition-all duration-200 whitespace-nowrap ${
-                filter === value
-                  ? 'bg-acid text-ink-950 font-bold'
-                  : 'text-white/40 hover:text-white'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+        {/* Filter bar */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 3,
+          background: 'var(--ink-2)', border: '1px solid var(--rim)',
+          borderRadius: 12, padding: 4,
+        }}>
+          {FILTERS.map(({ value, label }) => {
+            const active  = filter === value
+            const accent  = FILTER_ACCENT[value]
+            return (
+              <button key={value} onClick={() => setFilter(value)} style={{
+                padding: '6px 14px', borderRadius: 8, cursor: 'pointer', border: 'none',
+                fontFamily: 'var(--font-mono)', fontSize: '0.72rem', letterSpacing: '0.04em',
+                fontWeight: active ? 600 : 400,
+                background: active ? (accent ? `${accent}18` : 'var(--rim-2)') : 'transparent',
+                color: active ? (accent || '#fff') : 'rgba(255,255,255,0.4)',
+                outline: active && accent ? `1px solid ${accent}30` : 'none',
+                transition: 'all 0.15s',
+              }}>
+                {label}
+              </button>
+            )
+          })}
         </div>
       </div>
 
       {/* Grid */}
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '1rem' }}>
           {[...Array(8)].map((_, i) => (
-            <div key={i} className="card p-5 animate-pulse">
-              <div className="h-4 bg-white/5 rounded mb-3 w-2/3" />
-              <div className="h-3 bg-white/5 rounded mb-5 w-1/3" />
-              <div className="h-1.5 bg-white/5 rounded" />
+            <div key={i} className="card" style={{ padding: '1.25rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                <div className="skeleton" style={{ height: 14, width: '55%' }} />
+                <div className="skeleton" style={{ height: 22, width: 65, borderRadius: 99 }} />
+              </div>
+              <div className="skeleton" style={{ height: 10, width: '30%', marginBottom: 16 }} />
+              <div className="skeleton" style={{ height: 2, width: '100%', borderRadius: 99 }} />
             </div>
           ))}
         </div>
       ) : videos.length === 0 ? (
-        <div className="card p-16 text-center max-w-sm mx-auto">
-          <div className="text-5xl mb-4">
-            {filter === 'flagged' ? '🚩' : filter === 'safe' ? '✅' : '📂'}
+        <div className="card">
+          <div className="empty-state">
+            <div className="empty-icon" style={{ width: 64, height: 64, fontSize: '1.75rem', borderRadius: 18 }}>
+              {filter === 'flagged' ? '🚩' : filter === 'safe' ? '✅' : filter === 'processing' ? '⚙️' : '📂'}
+            </div>
+            <div>
+              <p style={{ fontFamily: 'var(--font-display)', fontWeight: 700, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>
+                {filter ? `No ${filter} videos` : 'Library is empty'}
+              </p>
+              <p style={{ fontSize: '0.875rem', color: 'rgba(255,255,255,0.3)' }}>
+                {filter ? 'Try a different filter.' : 'Upload your first video to get started.'}
+              </p>
+            </div>
           </div>
-          <p className="font-display font-semibold text-white text-lg mb-2">
-            {filter ? `No ${filter} videos` : 'Empty library'}
-          </p>
-          <p className="text-white/40 text-sm">
-            {filter ? 'Try a different filter.' : 'Upload your first video to get started.'}
-          </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {videos.map(video => (
-            <VideoCard
-              key={video._id}
-              video={video}
-              liveProgress={liveProgress[video._id]}
-              onDelete={handleDelete}
-              canDelete={canDelete}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Count */}
-      {!loading && videos.length > 0 && (
-        <p className="text-center text-xs font-mono text-white/20 mt-8">
-          {videos.length} video{videos.length !== 1 ? 's' : ''}
-          {filter ? ` · filtered by "${filter}"` : ''}
-        </p>
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '1rem' }}>
+            {videos.map((video, i) => (
+              <VideoCard
+                key={video._id}
+                video={video}
+                liveProgress={liveProgress[video._id]}
+                onDelete={handleDelete}
+                canDelete={canDelete}
+                style={{ animationDelay: `${i * 0.04}s` }}
+              />
+            ))}
+          </div>
+          <p style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: '0.68rem', color: 'rgba(255,255,255,0.2)', marginTop: '2rem', letterSpacing: '0.04em' }}>
+            {videos.length} video{videos.length !== 1 ? 's' : ''}
+            {filter ? ` · filtered by "${filter}"` : ''}
+          </p>
+        </>
       )}
     </div>
   )

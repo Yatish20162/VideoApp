@@ -3,18 +3,30 @@ const User = require("../models/User");
 
 /**
  * protect – verifies JWT and attaches req.user
+ *
+ * Token is read from (in priority order):
+ *  1. Authorization: Bearer <token>   ← standard API calls
+ *  2. ?token=<token> query param      ← video <src> / streaming URLs
+ *     (browsers cannot set headers on <video src="...">)
+ *
  * Usage: router.get("/route", protect, handler)
  */
 const protect = async (req, res, next) => {
   try {
     let token;
 
-    // Support both Authorization: Bearer <token> and cookie
+    // 1. Header (preferred — used by Axios interceptor for all API calls)
     if (
       req.headers.authorization &&
       req.headers.authorization.startsWith("Bearer ")
     ) {
       token = req.headers.authorization.split(" ")[1];
+    }
+
+    // 2. Query param fallback (used by <video src="/api/videos/:id/stream?token=...">)
+    //    Only accepted on the stream route to keep the attack surface minimal.
+    if (!token && req.query.token) {
+      token = req.query.token;
     }
 
     if (!token) {
