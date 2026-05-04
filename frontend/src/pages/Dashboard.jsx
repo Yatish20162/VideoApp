@@ -69,6 +69,41 @@ export default function Dashboard() {
         </p>
       </div>
 
+      {user?.role === "admin" && (
+  <div
+    className="anim-fade-up"
+    style={{
+      marginBottom: "2rem",
+      padding: "1.25rem",
+      border: "1px solid rgba(255,255,255,0.08)",
+      borderRadius: "12px",
+      background: "rgba(255,255,255,0.02)",
+    }}
+  >
+    <h2
+      style={{
+        fontFamily: "var(--font-display)",
+        fontSize: "1.1rem",
+        marginBottom: "0.5rem",
+      }}
+    >
+      Admin Controls
+    </h2>
+
+    <p style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.4)" }}>
+      Manage users, assign videos, and control system access.
+    </p>
+
+    <Link
+      to="/admin"
+      className="btn btn-primary"
+      style={{ marginTop: "10px", display: "inline-block" }}
+    >
+      Open Admin Panel →
+    </Link>
+  </div>
+)}
+
       {/* Stats grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '2.5rem' }}>
         <StatCard label="Total"      value={videos.length} color="rgba(255,255,255,0.6)" icon="📦" delay={1} />

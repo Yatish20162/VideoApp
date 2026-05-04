@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard'
 import Upload from './pages/Upload'
 import Library from './pages/Library'
 import Player from './pages/Player'
+import AdminPanel from './pages/AdminPanel'
 
 function AppLayout({ children }) {
   return (
@@ -39,6 +40,15 @@ function AppRoutes() {
       <Route path="/player/:id" element={
         <ProtectedRoute><AppLayout><Player /></AppLayout></ProtectedRoute>
       } />
+      <Route
+  path="/admin"
+  element={
+    <ProtectedRoute requiredRole="admin"><AppLayout>
+      <AdminPanel />
+      </AppLayout>
+    </ProtectedRoute>
+  }
+/>
 
       <Route path="*" element={<Navigate to={isAuthenticated ? '/dashboard' : '/login'} replace />} />
     </Routes>

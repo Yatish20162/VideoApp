@@ -12,7 +12,7 @@ export default function Register() {
   const { register } = useAuth()
   const navigate = useNavigate()
 
-  const [form, setForm]     = useState({ name: '', email: '', password: '', role: 'editor' })
+  const [form, setForm]     = useState({ name: '', email: '', password: '', role: 'editor' ,orgName:''})
   const [error, setError]   = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -22,7 +22,7 @@ export default function Register() {
     e.preventDefault()
     setError(''); setLoading(true)
     try {
-      await register(form.name, form.email, form.password, form.role)
+      await register(form.name, form.email, form.password, form.role ,form.orgName)
       navigate('/dashboard')
     } catch (err) {
       setError(err.response?.data?.message || 'Registration failed. Please try again.')
@@ -97,6 +97,17 @@ export default function Register() {
               <label className="field-label">Password</label>
               <input type="password" className="field-input" placeholder="Min. 6 characters"
                 value={form.password} onChange={set('password')} required minLength={6} />
+            </div>
+            <div>
+              <label className="field-label">Organization Name</label>
+              <input
+                type="text"
+                className="field-input"
+                placeholder="Acme Corp"
+                value={form.orgName}
+                onChange={set('orgName')}
+                required
+              />
             </div>
 
             {/* Role selector */}

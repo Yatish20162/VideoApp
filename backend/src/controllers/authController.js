@@ -10,51 +10,42 @@ const { generateToken, sanitizeUser } = require("../utils/token");
  * - If orgId is provided  → joins an existing org (role stays as given)
  * - Otherwise             → creates a personal default org
  */
-const register = async (req, res, next) => {
+const register = async (req, res) => {
   try {
-    const { name, email, password, role, orgName, orgId } = req.body;
+    const { name, email, password, role, orgName } = req.body;
 
-    // Basic validation
-    if (!name || !email || !password) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Name, email and password are required." });
+    if (!name || !email || !password || !orgName) {
+      return res.status(400).json({
+        success: false,
+        message: "All fields including orgName are required.",
+      });
     }
 
-    // Check duplicate email
-    const existing = await User.findOne({ email: email.toLowerCase() });
+    // Check user exists
+    const existing = await User.findOne({ email });
     if (existing) {
-      return res
-        .status(409)
-        .json({ success: false, message: "Email already registered." });
+      return res.status(409).json({
+        success: false,
+        message: "Email already registered",
+      });
     }
 
-    let organization;
+    // 🔥 FIND OR CREATE ORG
+    let organization = await Organization.findOne({ name: orgName });
 
-    if (orgId) {
-      // Join existing org
-      organization = await Organization.findById(orgId);
-      if (!organization) {
-        return res
-          .status(404)
-          .json({ success: false, message: "Organization not found." });
-      }
-    } else {
-      // Create new org
-      const newOrgName = orgName || `${name}'s Organization`;
-      organization = await Organization.create({ name: newOrgName });
+    if (!organization) {
+      organization = await Organization.create({
+        name: orgName,
+        members: [],
+      });
     }
 
-    // Determine role — first member of a new org becomes admin
+    // Role logic
     const assignedRole =
-      organization.members.length === 0
-        ? "admin"
-        : role && ["viewer", "editor", "admin"].includes(role)
+      role && ["viewer", "editor", "admin"].includes(role)
         ? role
         : "editor";
 
-    
-    console.log("here")
     // Create user
     const user = await User.create({
       name,
@@ -63,25 +54,21 @@ const register = async (req, res, next) => {
       role: assignedRole,
       orgId: organization._id,
     });
-    console.log(user)
-    // Add user to org members
+
+    // Add to org
     organization.members.push(user._id);
     await organization.save();
 
-    console.log("Saved")
     const token = generateToken(user._id);
-    
-    res.status(201).json({
+
+    return res.status(201).json({
       success: true,
-      message: "Registration successful.",
       token,
       user: sanitizeUser(user),
     });
-
-    console.log(res)
   } catch (err) {
-    console.error("REGISTER ERROR:", err); // 👈 CRITICAL
-    res.status(500).json({
+    console.error(err);
+    return res.status(500).json({
       success: false,
       message: err.message,
     });

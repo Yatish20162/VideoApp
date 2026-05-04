@@ -83,12 +83,26 @@ const getVideos = async (req, res, next) => {
   try {
     const { status, page = 1, limit = 20, sort = "newest" } = req.query;
 
-    const filter = {};
+    const filter = { orgId: req.user.orgId };
 
     if (req.user.role === "admin") {
+      // Admin sees everything in org
       filter.orgId = req.user.orgId;
-    } else {
-      filter.owner = req.user._id;
+    }
+
+    else if (req.user.role === "editor") {
+      // Editor sees:
+      // 1. videos they uploaded
+      // 2. videos assigned to them
+      filter.$or = [
+        { owner: req.user._id },
+        { assignedTo: req.user._id }
+      ];
+    }
+
+    else if (req.user.role === "viewer") {
+      // Viewer ONLY sees assigned videos
+      filter.assignedTo = req.user._id;
     }
 
     if (status && ["processing", "safe", "flagged", "error"].includes(status)) {
@@ -128,6 +142,31 @@ const getVideos = async (req, res, next) => {
   }
 };
 
+const canAccessVideo = (video, user) => {
+  if (!video || !user) return false;
+
+  // Admin → full org access
+  if (user.role === "admin") {
+    return video.orgId?.toString() === user.orgId?.toString();
+  }
+
+  // Editor → owner OR assigned
+  if (user.role === "editor") {
+    return (
+      video.owner?.toString() === user._id.toString() ||
+      video.assignedTo?.some(id => id.toString() === user._id.toString())
+    );
+  }
+
+  // Viewer → ONLY assigned
+  if (user.role === "viewer") {
+    return video.assignedTo?.some(
+      id => id.toString() === user._id.toString()
+    );
+  }
+
+  return false;
+};
 /**
  * GET /api/videos/:id
  * Auth: any role
@@ -143,12 +182,11 @@ const getVideoById = async (req, res, next) => {
       return res.status(404).json({ success: false, message: "Video not found." });
     }
 
-    const isOwner   = video.owner._id.toString() === req.user._id.toString();
-    const isAdmin   = req.user.role === "admin";
-    const isSameOrg = video.orgId?.toString() === req.user.orgId?.toString();
-
-    if (!isOwner && !(isAdmin && isSameOrg)) {
-      return res.status(403).json({ success: false, message: "Access denied." });
+    if (!canAccessVideo(video, req.user)) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied.",
+      });
     }
 
     res.status(200).json({ success: true, video });
@@ -209,13 +247,11 @@ const streamVideoHandler = async (req, res, next) => {
       return res.status(404).json({ success: false, message: "Video not found." });
     }
 
-    // Access check — same ownership rules as getVideoById
-    const isOwner   = video.owner.toString() === req.user._id.toString();
-    const isAdmin   = req.user.role === "admin";
-    const isSameOrg = video.orgId?.toString() === req.user.orgId?.toString();
-
-    if (!isOwner && !(isAdmin && isSameOrg)) {
-      return res.status(403).json({ success: false, message: "Access denied." });
+    if (!canAccessVideo(video, req.user)) {
+      return res.status(403).json({
+        success: false,
+        message: "You do not have access to this video",
+      });
     }
 
     // Block streaming if still processing

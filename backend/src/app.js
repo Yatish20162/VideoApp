@@ -114,7 +114,7 @@ app.get("/health", (req, res) => {
 app.use("/api/auth",   authRoutes);
 app.use("/api/videos", videoRoutes);
 app.use("/api/users",  userRoutes);
-
+app.use("/api/admin", require("./routes/adminRoutes"));
 // ── 404 + global error handler ───────────────────────────────────────────────
 app.use(notFound);
 app.use(errorHandler);

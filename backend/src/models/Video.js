@@ -48,6 +48,12 @@ const videoSchema = new mongoose.Schema(
       score: { type: Number, default: 0 },   // 0.0 – 1.0
       reason: { type: String, default: "" }, // human-readable
     },
+    assignedTo: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
     processingProgress: {
       type: Number, // 0–100
       default: 0,
